@@ -1,5 +1,4 @@
-import React, { useRef, useState } from "react";
-import logo from "./logo.svg";
+import React, { useRef, useState, useEffect } from "react";
 import "./App.css";
 import { str } from "./testString";
 
@@ -13,40 +12,11 @@ import "ace-builds/src-min-noconflict/ext-searchbox";
 import "ace-builds/src-min-noconflict/ext-language_tools";
 
 import parserBabel from "prettier/parser-babylon";
-//import parserBabel from "@babel/parser"; //! UNINSTALL BABEL AGAIN npm uninstall @babel/parser
 import prettier from "prettier/standalone";
 
 const espree = require("espree");
 const jshint = require("jshint");
 
-const opt = {
-  indent_size: 4,
-  indent_char: " ",
-  indent_with_tabs: false,
-  editorconfig: false,
-  eol: "\n",
-  end_with_newline: true,
-  indent_level: 0,
-  preserve_newlines: true,
-  max_preserve_newlines: 10,
-  space_in_paren: false,
-  space_in_empty_paren: false,
-  jslint_happy: true,
-  space_after_anon_function: false,
-  space_after_named_function: false,
-  brace_style: "collapse",
-  unindent_chained_methods: false,
-  break_chained_methods: true,
-  keep_array_indentation: false,
-  unescape_strings: false,
-  wrap_line_length: 0,
-  e4x: false,
-  comma_first: false,
-  operator_position: "before-newline",
-  indent_empty_lines: false,
-  templating: ["auto"],
-  space_before_conditional: true
-};
 
 const optEspree = {
   // attach range information to each node
@@ -83,11 +53,12 @@ const optPrettier = {
 
 function App() {
   const [value, setValue] = useState(str);
+  const [functions, pushFunctions] = useState({})
   const editorRef = useRef();
 
+  console.log(functions);
+
   function onLoad(ed) {
-    console.log(parserBabel);
-    // ESPRIMA PORTION
     //get total line count => editor.session.getLength()
     /*   editorRef.current = ed;
     console.log("i've loaded, ", ed.session.getLength());
@@ -105,38 +76,28 @@ function App() {
     //editor.getSelectionRange()
   }
 
-  function getTokens() {
-    for (let i = 0; i < editorRef.current.session.getLength(); i++) {
-      console.log(editorRef.current.session.getTokens(i));
-    }
-  }
-  function onChange(newValue) {
-    console.log("change", newValue);
-    setValue(newValue);
-  }
-
   function onSelectionChange(newValue, event) {
-    console.log("select-change", newValue);
-    console.log("select-change-event", event);
+    /* console.log("select-change", newValue);
+    console.log("select-change-event", event); */
   }
 
   function onCursorChange(newValue, event) {
-    console.log("cursor-change", newValue);
-    console.log("cursor-change-event", event);
+    /*  console.log("cursor-change", newValue);
+     console.log("cursor-change-event", event); */
   }
 
   function onValidate(annotations) {
-    console.log("onValidate", annotations);
-  }
+/*     console.log("onValidate", annotations);
+ */  }
 
   function beautify() {
     let b = null;
     try {
-      b = prettier.format(value, optPrettier); //js_beautify(value, opt);
+      b = prettier.format(value, optPrettier);
       const espAst = espree.parse(b, optEspree);
       setValue(b);
       console.log(espAst);
-      console.log(loopThroughFunctionsESPREE(espAst));
+      pushFunctions(loopThroughFunctionsESPREE(espAst));
     } catch (err) {
       console.log(espree.parse(b, optEspree), err);
       jshint.JSHINT(
@@ -177,6 +138,9 @@ function App() {
       console.log(`${func.name} from line ${func.line} to ${func.last}`);
     }
   }
+
+
+
   let finalOutput = "";
   let test = "";
 
@@ -187,6 +151,7 @@ function App() {
     const {
       loc: { end }
     } = program;
+    let funcs = {}
 
     for (let ast of body) {
       console.group(`%cAST GROUP ${ast.type}`, "color:red;font-weight:bold");
@@ -196,7 +161,7 @@ function App() {
 
       switch (ast.type) {
         case "VariableDeclaration":
-          splitVariableDeclaration(ast.declarations);
+          funcs = { ...funcs, ...splitVariableDeclaration(ast.declarations) };
           break;
         case "FunctionDeclaration":
           console.log(
@@ -205,10 +170,17 @@ function App() {
           FUNCTION BODY`,
             "color:aqua"
           );
+          funcs[ast.id.name] = { location: { start: ast.loc.start.line, end: ast.loc.end.line } }
           splitStatement(ast.body);
           break;
         case "ExpressionStatement":
-          splitExpressionStatement(ast.expression);
+          console.warn(splitExpressionStatement(ast.expression));
+          if (ast.expression.arguments.length > 0) {
+            for (let argument of ast.expression.arguments) {
+
+              console.warn(splitExpressionStatement(argument))
+            }
+          }
           console.log(
             `%cEXPRESSION ENCOUNTERED: 
           line ${ast.loc.start.line} to ${ast.loc.end.line}
@@ -222,9 +194,11 @@ function App() {
       }
       console.groupEnd(`AST GROUP ${ast.type}`);
     }
+    return funcs;
   }
 
   function splitVariableDeclaration(declarations) {
+    const funcs = {}
     for (let declaration of declarations) {
       switch (declaration.init.type) {
         case "Literal":
@@ -238,6 +212,7 @@ function App() {
             `%cArrow Function: ${declaration.id.name} at line ${declaration.init.loc.start.line} till ${declaration.init.loc.end.line}`,
             "color:goldenrod"
           );
+          funcs[declaration.id.name] = { location: { start: declaration.init.loc.start.line, end: declaration.init.loc.end.line } };
           splitStatement(declaration.init.body);
           break;
         case "FunctionExpression":
@@ -245,12 +220,15 @@ function App() {
             `%cFunction expression with function keyword: ${declaration.id.name} at line ${declaration.init.loc.start.line} till ${declaration.init.loc.end.line}`,
             "color:goldenrod"
           );
+          funcs[declaration.id.name] = { location: { start: declaration.init.loc.start.line, end: declaration.init.loc.end.line } };
           splitStatement(declaration.init.body);
           break;
         default:
           break;
       }
     }
+
+    return funcs;
   }
 
   function splitStatement(body) {
@@ -260,49 +238,47 @@ function App() {
           test = "";
           finalOutput = "";
           steps = 0;
-          splitStatement(statements);
-          //splitExpressionStatement(statements.expression);
+          //console.log(splitStatement(statements));
+          splitExpressionStatement(statements.expression);
         }
         break;
       case "ExpressionStatement":
-        splitExpressionStatement(body.expression);
-        console.log(test);
+        console.log(splitExpressionStatement(body.expression));
+      //console.warn(splitExpressionStatement(body.expression));
       default:
         break;
     }
   }
 
-  function splitExpressionStatement(expression) {
+  function splitExpressionStatement(expression, obj = {}) {
     steps++;
     switch (expression.type) {
+      case 'FunctionExpression':
+        return splitStatement(expression.body);
       case "CallExpression":
-        // console.warn("CALLEXPRESSION");
-        const value = `\nVALUE OF CALL: ${
-          expression.arguments[0] ? expression.arguments[0].value : "none"
-        }`;
-        finalOutput += value;
-        test += value;
-        splitExpressionStatement(expression.callee);
-        break;
+        const value = expression.arguments[0] ? expression.arguments[0].value : "none"
+        const output = `\nArguments OF CALL: ${value
+
+          }`;
+        finalOutput += output;
+        test += output;
+        return splitExpressionStatement(expression.callee, { argument: value, loc: expression.loc });
       case "MemberExpression":
-        const temp = `\nMETHOD CHAIN : ${splitExpressionStatement(
-          expression.property
-        )}`;
-        finalOutput += temp;
-        test += temp;
-        //console.warn("MEMBEREXPRESSION");
-        splitExpressionStatement(expression.object);
-        break;
-      //return expression.property.name;
+        const method = expression.property.name
+        const outputMeth = `\nMETHOD CHAIN : ${JSON.stringify(method)}`;
+        //finalOutput += outputMeth;
+        test += outputMeth;
+        return splitExpressionStatement(expression.object, { ...obj, [expression.property.name]: obj.argument });
       case "Identifier":
         const temp2 = `\nFUNCTION CALL: ${expression.name}`;
-        //console.warn("IDENTIFIER ", expression);
         finalOutput += temp2;
         test += temp2;
-        return expression.name;
+        return { [expression.name]: { ...obj } }
       default:
         break;
     }
+
+    return obj
   }
 
   // Render editor
@@ -317,7 +293,7 @@ function App() {
         width="700px"
         name="master-the-event-loop"
         onLoad={onLoad}
-        onChange={onChange}
+        onChange={(newValue) => setValue(newValue)}
         onSelectionChange={onSelectionChange}
         onCursorChange={onCursorChange}
         onValidate={onValidate}
@@ -334,6 +310,7 @@ function App() {
           tabSize: 2
         }}
       />
+      <div>{JSON.stringify(functions, null, 2)}</div>
     </>
   );
 }
