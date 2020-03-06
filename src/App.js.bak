@@ -1,0 +1,198 @@
+import React, { useRef, useState } from "react";
+import logo from "./logo.svg";
+import "./App.css";
+import { str } from "./testString";
+
+/* import Editor, { monaco } from "@monaco-editor/react";
+ */
+import AceEditor from "react-ace";
+import "ace-builds/src-noconflict/mode-javascript";
+import "ace-builds/src-noconflict/snippets/javascript";
+import "ace-builds/src-noconflict/theme-monokai";
+import "ace-builds/src-min-noconflict/ext-searchbox";
+import "ace-builds/src-min-noconflict/ext-language_tools";
+
+const esprima = require("esprima");
+const { js_beautify } = require("js-beautify");
+const jshint = require("jshint");
+
+const opt = {
+  indent_size: 4,
+  indent_char: " ",
+  indent_with_tabs: false,
+  editorconfig: false,
+  eol: "\n",
+  end_with_newline: true,
+  indent_level: 0,
+  preserve_newlines: true,
+  max_preserve_newlines: 10,
+  space_in_paren: false,
+  space_in_empty_paren: false,
+  jslint_happy: true,
+  space_after_anon_function: false,
+  space_after_named_function: false,
+  brace_style: "collapse",
+  unindent_chained_methods: false,
+  break_chained_methods: true,
+  keep_array_indentation: false,
+  unescape_strings: false,
+  wrap_line_length: 0,
+  e4x: false,
+  comma_first: false,
+  operator_position: "before-newline",
+  indent_empty_lines: false,
+  templating: ["auto"],
+  space_before_conditional: true
+};
+
+function App() {
+  const [value, setValue] = useState(str);
+  const editorRef = useRef();
+
+  function onLoad(ed) {
+    // ESPRIMA PORTION
+    console.log(jshint);
+    //get total line count => editor.session.getLength()
+    /*   editorRef.current = ed;
+    console.log("i've loaded, ", ed.session.getLength());
+    // find certain thing
+    ed.find("test", {
+      backwards: false,
+      wrap: false,
+      caseSensitive: false,
+      wholeWord: false,
+      regExp: false
+    });
+    ed.findNext();
+    ed.findPrevious();
+    getTokens(); */
+
+    //editor.getSelectionRange()
+  }
+
+  function getTokens() {
+    for (let i = 0; i < editorRef.current.session.getLength(); i++) {
+      console.log(editorRef.current.session.getTokens(i));
+    }
+  }
+  function onChange(newValue) {
+    console.log("change", newValue);
+    setValue(newValue);
+  }
+
+  function onSelectionChange(newValue, event) {
+    console.log("select-change", newValue);
+    console.log("select-change-event", event);
+  }
+
+  function onCursorChange(newValue, event) {
+    console.log("cursor-change", newValue);
+    console.log("cursor-change-event", event);
+  }
+
+  function onValidate(annotations) {
+    console.log("onValidate", annotations);
+  }
+
+  function beautify() {
+    const b = js_beautify(value, opt);
+    setValue(b);
+    console.log(esprima.parseScript(b));
+    jshint.JSHINT(
+      b,
+      {
+        options: {
+          undef: true,
+          indent: 4,
+          maxerr: 50,
+          esversion: 6
+        }
+      },
+      null
+    );
+    console.log(jshint.JSHINT.data());
+  }
+
+  // Render editor
+  return (
+    <>
+      <button onClick={beautify}>Beautify me And Play</button>
+      <AceEditor
+        placeholder="Placeholder Text"
+        mode="javascript"
+        theme="monokai"
+        name="master-the-event-loop"
+        onLoad={onLoad}
+        onChange={onChange}
+        onSelectionChange={onSelectionChange}
+        onCursorChange={onCursorChange}
+        onValidate={onValidate}
+        fontSize={14}
+        showPrintMargin={true}
+        showGutter={true}
+        highlightActiveLine={true}
+        value={value}
+        setOptions={{
+          enableBasicAutocompletion: true,
+          enableLiveAutocompletion: true,
+          enableSnippets: true,
+          showLineNumbers: true,
+          tabSize: 2
+        }}
+      />
+    </>
+  );
+}
+
+// REACT MONACO
+/* function App() {
+  const [isEditorReady, setIsEditorReady] = useState(false);
+  const valueGetter = useRef();
+  const editorRef = useRef();
+
+  function handleEditorDidMount(_valueGetter, editor) {
+    setIsEditorReady(true);
+    editorRef.current = editor;
+    valueGetter.current = _valueGetter;
+  }
+
+  function handleShowValue() {
+    console.log(valueGetter.current());
+  }
+
+  function gotoToLine() {
+    editorRef.current.revealPositionInCenter({ lineNumber: 50, column: 120 });
+  }
+
+  function tokenizeIt() {
+    let m = editorRef.current.getModel();
+    let word = m.getWordAtPosition(m.getPositionAt(34));
+    console.log(word);
+    console.log(editorRef);
+    console.log(m.getLineContent(3));
+    //console.log(tokenize(word, "Javascript"));
+  }
+
+  return (
+    <>
+      <button onClick={handleShowValue} disabled={!isEditorReady}>
+        Show value
+      </button>
+      <button onClick={gotoToLine} disabled={!isEditorReady}>
+        Goto line 50 column 120
+      </button>
+      <button onClick={tokenizeIt} disabled={!isEditorReady}>
+        Print tokens
+      </button>
+      <Editor
+        height="90vh"
+        language="javascript"
+        value={str}
+        editorDidMount={handleEditorDidMount}
+        theme="vs-dark"
+      />
+    </>
+  );
+}
+ */
+export default App;
